@@ -1,5 +1,7 @@
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 
+import content
+
 
 def menu_kb():
     kb = [
@@ -12,7 +14,7 @@ def menu_kb():
     keyboard = ReplyKeyboardMarkup(
         keyboard=kb,
         resize_keyboard=True,
-        input_field_placeholder="Tanlang"
+        input_field_placeholder=content.tanlang
     )
 
     return keyboard
@@ -21,7 +23,7 @@ def menu_kb():
 def cancel_kb():
     kb = [
         [
-            KeyboardButton(text="🔙 Bosh Menu")
+            KeyboardButton(text=content.bosh_menu)
         ]
     ]
 
