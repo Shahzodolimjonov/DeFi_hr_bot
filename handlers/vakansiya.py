@@ -8,6 +8,7 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import async_session
 from sqlalchemy.orm import Session
 
+import content
 from config import ADMIN_ID, get_db, CHANNEL_ID, SessionLocal
 from keyboard import menu_kb, cancel_kb
 from models.vakansiya import Vakansiya, User
@@ -41,38 +42,38 @@ async def get_or_create_user(user_id: int, username: str):
             return None
 
 
-@router.message(F.text == "🔙 Bosh Menu")
+@router.message(F.text == content.bosh_menu)
 async def cancel_handler(message: types.Message, state: FSMContext) -> None:
     await state.clear()
-    await message.answer("Qaytish", reply_markup=menu_kb())
+    await message.answer(content.qaytish, reply_markup=menu_kb())
 
 
 @router.message(F.text == "Vakansiya")
 async def start_admin_housing(message: types.Message, state: FSMContext):
     logging.info("Admin housing command received.")
-    await message.answer("Kompaniya nomini kiriting:", reply_markup=cancel_kb())
+    await message.answer(content.company, reply_markup=cancel_kb())
     await state.set_state(VakansiyaForm.kompaniya)
 
 
 @router.message(VakansiyaForm.kompaniya)
 async def add_companiya(message: types.Message, state: FSMContext):
     if not message.text.strip():
-        await message.answer("Kompaniya nomi bo'sh bo'lishi mumkin emas. Iltimos, qayta kiriting:")
+        await message.answer(content.company2)
         return
     await state.update_data(kompaniya=message.text)
     logging.info("Updated state with kompaniya: %s", message.text)
-    await message.answer("Lavozimni kiriting")
+    await message.answer(content.lavozim)
     await state.set_state(VakansiyaForm.Lavozim)
 
 
 @router.message(VakansiyaForm.Lavozim)
 async def add_Lavozim(message: types.Message, state: FSMContext):
     if not message.text.strip():
-        await message.answer("Lavozim bo'sh bo'lishi mumkin emas. Iltimos, qayta kiriting:")
+        await message.answer(content.lavozim2)
         return
     await state.update_data(Lavozim=message.text)
     logging.info("Updated state with Lavozim: %s", message.text)
-    await message.answer("Maosh summasini kiriting")
+    await message.answer(content.maosh)
     await state.set_state(VakansiyaForm.maosh)
 
 
@@ -80,7 +81,7 @@ async def add_Lavozim(message: types.Message, state: FSMContext):
 async def add_maosh(message: types.Message, state: FSMContext):
     await state.update_data(maosh=message.text)
     logging.info("Updated state with maosh: %s", message.text)
-    await message.answer("Ish turini kiriting")
+    await message.answer(content.ish_turi)
     await state.set_state(VakansiyaForm.Ish_turi)
 
 
@@ -88,7 +89,7 @@ async def add_maosh(message: types.Message, state: FSMContext):
 async def add_ish_turi(message: types.Message, state: FSMContext):
     await state.update_data(Ish_turi=message.text)
     logging.info("Updated state with malumot: %s", message.text)
-    await message.answer("Qo'shimcha malumot kiriting")
+    await message.answer(content.all_data)
     await state.set_state(VakansiyaForm.malumot)
 
 
@@ -96,7 +97,7 @@ async def add_ish_turi(message: types.Message, state: FSMContext):
 async def add_malumot(message: types.Message, state: FSMContext):
     await state.update_data(malumot=message.text)
     logging.info("Updated state with malumot: %s", message.text)
-    await message.answer("Manzilni kiriting")
+    await message.answer(content.manzil)
     await state.set_state(VakansiyaForm.manzil)
 
 
@@ -104,7 +105,7 @@ async def add_malumot(message: types.Message, state: FSMContext):
 async def add_manzil(message: types.Message, state: FSMContext):
     await state.update_data(manzil=message.text)
     logging.info("Updated state with malumot: %s", message.text)
-    await message.answer("Biokartadagi lakatsiyani kiriting")
+    await message.answer(content.lakatsiya)
     await state.set_state(VakansiyaForm.location)
 
 
@@ -115,10 +116,12 @@ async def add_location(message: types.Message, state: FSMContext):
         maps_url = f"https://maps.google.com/?q={lat},{lon}"
         await state.update_data(location={'latitude': lat, 'longitude': lon, 'maps_url': maps_url})
         logging.info("Updated state with location: %s", {'latitude': lat, 'longitude': lon, 'maps_url': maps_url})
-        await message.answer("Mas'ul shaxsni kiriting")
-        await state.set_state(VakansiyaForm.masul)
     else:
-        await message.answer("Iltimos, lokatsiyani kiriting")
+        # await message.answer(content.lakatsiya2)
+        await state.update_data(location=None)
+        logging.info("Joylashuv koʻrsatilmagan.")
+    await message.answer(content.masul)
+    await state.set_state(VakansiyaForm.masul)
 
 
 @router.message(VakansiyaForm.masul)
@@ -130,7 +133,7 @@ async def add_masul(message: types.Message, state: FSMContext):
     username = message.from_user.username
     user = await get_or_create_user(user_id, username)
     if not user:
-        await message.answer("❌ Foydalanuvchi ma'lumotlarini saqlashda xatolik yuz berdi.")
+        await message.answer(content.save_error)
         return
 
     data = await state.get_data()
@@ -143,6 +146,7 @@ async def add_masul(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
 
     async for db in get_db():
+        location_data = data.get('location') or {'latitude': None, 'longitude': None, 'maps_url': '-'}
         new_vakansiya = Vakansiya(
             kompaniya=data.get('kompaniya'),
             Lavozim=data.get('Lavozim'),
@@ -150,9 +154,9 @@ async def add_masul(message: types.Message, state: FSMContext):
             Ish_turi=data.get('Ish_turi'),
             malumot=data.get('malumot'),
             manzil=data.get('manzil'),
-            latitude=data.get('location')['latitude'],
-            longitude=data.get('location')['longitude'],
-            maps_url=data.get('location')['maps_url'],
+            latitude=location_data['latitude'],
+            longitude=location_data['longitude'],
+            maps_url=location_data['maps_url'],
             masul=data.get('masul'),
             status="pending",
             user_id=user_id
@@ -163,19 +167,19 @@ async def add_masul(message: types.Message, state: FSMContext):
         await db.refresh(new_vakansiya)
 
     msg = (
-        f"🏢 Kompaniya: {data.get('kompaniya')}\n"
-        f"👤 Lavozim: {data.get('Lavozim')}\n"
-        f"💰 Maosh: {data.get('maosh')}\n"
-        f"🔹 Ish_turi: {data.get('Ish_turi')}\n"
-        f"ℹ Qo'shimcha ma'lumot: {data.get('malumot')}\n"
-        f"📍 Manzil: {data.get('manzil')}\n"
-        f"🌎 Lokatsiya: {data.get('location')['maps_url']}\n"
-        f"👤 Mas'ul: {data.get('masul')}"
+        f"{content.Kompaniya} {data.get('kompaniya')}\n"
+        f"{content.Lavozim} {data.get('Lavozim')}\n"
+        f"{content.Maosh} {data.get('maosh')}\n"
+        f"{content.Ish_turi} {data.get('Ish_turi')}\n"
+        f"{content.Qoshimcha} {data.get('malumot')}\n"
+        f"{content.Manzil} {data.get('manzil')}\n"
+        f"{content.Lokatsiya} {location_data['maps_url']}\n"
+        f"{content.Masul} {data.get('masul')}"
     )
 
     await bot.send_message(chat_id=ADMIN_ID, text=msg, reply_markup=admin_kb(new_vakansiya.id))
     await state.clear()
-    await message.answer("Ma'lumotlaringiz qabul qilindi.")
+    await message.answer(content.moderator)
 
 
 @router.callback_query(F.data.startswith("accept_"))
@@ -191,23 +195,23 @@ async def accept_vacancy(callback: CallbackQuery):
             await db.commit()
 
             msg = (
-                f"🏢 Kompaniya: {vakansiya.kompaniya}\n"
-                f"👤 Lavozim: {vakansiya.Lavozim}\n"
-                f"🔹 Ish_turi: {vakansiya.Ish_turi}\n"
-                f"💰 Maosh: {vakansiya.maosh}\n"
-                f"ℹ Qo'shimcha ma'lumotlar: {vakansiya.malumot}\n"
-                f"📍 Manzil: {vakansiya.manzil}\n"
-                f"🌎 Lokatsiya: {vakansiya.maps_url}\n"
-                f"👤 Mas'ul: {vakansiya.masul}"
+                f"{content.Kompaniya} {vakansiya.kompaniya}\n"
+                f"{content.Lavozim} {vakansiya.Lavozim}\n"
+                f"{content.Ish_turi} {vakansiya.Ish_turi}\n"
+                f"{content.Maosh} {vakansiya.maosh}\n"
+                f"{content.Qoshimcha} {vakansiya.malumot}\n"
+                f"{content.Manzil} {vakansiya.manzil}\n"
+                f"{content.Lokatsiya}{vakansiya.maps_url or '-'}\n"
+                f"{content.Masul} {vakansiya.masul}"
             )
 
             await bot.send_message(chat_id=CHANNEL_ID, text=msg)
             if vakansiya.user_id:
-                await bot.send_message(chat_id=vakansiya.user_id, text="✅ Sizning vakansiyangiz qabul qilindi!")
+                await bot.send_message(chat_id=vakansiya.user_id, text=content.state)
 
-            await callback.message.edit_text("✅ Vakansiya tasdiqlandi va kanalga joylandi.")
+            await callback.message.edit_text(content.cannel_save)
         else:
-            await callback.message.edit_text("⚠️ Vakansiya topilmadi.")
+            await callback.message.edit_text(content.not_found)
 
 
 @router.callback_query(F.data.startswith("reject_"))
@@ -228,13 +232,13 @@ async def reject_vacancy(callback: CallbackQuery):
                 db.commit()
 
                 if vakansiya.user_id:
-                    await bot.send_message(chat_id=vakansiya.user_id, text="❌ Sizning vakansiyangiz rad etildi!")
+                    await bot.send_message(chat_id=vakansiya.user_id, text=content.error)
 
-                await callback.message.edit_text("❌ Vakansiya rad etildi va o‘chirildi.")
+                await callback.message.edit_text(content.error2)
             else:
-                await callback.message.edit_text("⚠️ Vakansiya topilmadi.")
+                await callback.message.edit_text(content.not_found)
     except (IndexError, ValueError) as e:
         await callback.message.edit_text(
-            "⚠️ Vakansiya ID ni o'qishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
+            content.error3)
         logging.error(f"Error parsing vacancy ID: {e}")
 

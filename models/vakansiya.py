@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Float, BigInteger, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, BigInteger, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -20,6 +21,7 @@ class Vakansiya(Base):
     maps_url = Column(String, nullable=True)
     masul = Column(String, nullable=False)
     status = Column(String, default="pending")
+    created_at = Column(DateTime, default=datetime.now)
     user_id = Column(BigInteger, ForeignKey("users.telegram_id"), nullable=False)
 
     def __repr__(self):
